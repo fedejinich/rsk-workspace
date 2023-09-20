@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+// Simple RBTC-AnyToken Pool
+// by using this pool, users can swap and check for liquidity
+// without exposing their addresses
+contract SimpleAMM {
+    uint256 public tokenBSupply; // to handle rbtc balance
+    uint256 public tokenASupply = 90000; // mega arbitrary 
+    uint256 public constant m = 4; // arbitrary 
+    uint256 public constant c = 3; // super arbitrary 
+
+    address MUL_ADDR = 0x0000000000000000000000000000000001000013;
+    address ADD_ADDR = 0x0000000000000000000000000000000001000011;
+    address DECRYPT_ADDR = 0x0000000000000000000000000000000001000016;
+
+    mapping(address => bytes) public balancesA;
+
+    // todo(fedejinich) it should be between two tokens 
+    function swap(bytes calldata amountA, bytes calldata amountB) external payable {
+        uint256 pricePlain = m * tokenASupply + c; // bonding curve p = m * x + c
+
+        bytes memory priceA = mulPlain(pricePlain, amountA); // ct x pt
+
+//        require(amountB >= decrypt(priceA), "Insufficient TokenB sent!");
+
+        balancesA[msg.sender] = add(balancesA[msg.sender], amountA);
+
+        tokenASupply += decrypt(amountA); // ideally it should be a keyswitch + decrypt
+        tokenBSupply -= decrypt(amountB); // ideally it should be a keyswitch + decrypt
+    }
+
+    /*
+    function sell(uint256 amount) external {
+        require(balances[msg.sender] >= amount, "Insufficient tokens!");
+
+        uint256 price = (m * tokenSupply + c) * amount;
+        payable(msg.sender).transfer(price);
+
+        balances[msg.sender] -= amount;
+        tokenSupply -= amount;
+    }
+
+    */
+    // multiplies a plain value with a ciphertext and applies relinearization 
+    function mulPlain(uint256 num, bytes memory amount) 
+        internal pure 
+        returns (bytes memory)
+    {
+        bytes memory numBytes = abi.encodePacked(num);
+        bytes memory numBytesLen = abi.encodePacked(numBytes.length);
+
+        bytes memory amountLen = abi.encodePacked(amount.length);
+
+        // encode data
+        bytes memory data = bytes.concat(numBytesLen, amountLen, 
+                                                numBytes, amount);
+        
+        // MUL contract applies relinearization after each multiplication
+        return callToPrec(MUL_ADDR, data);
+    }
+
+    function decrypt(bytes memory data) internal pure returns (uint256) {
+        bytes memory res = callToPrec(DECRYPT_ADDR, data);
+
+        return uint256(bytes32(res));
+    }
+
+    function add(bytes memory op1, bytes memory op2) 
+        internal 
+        pure
+        returns (bytes memory)
+    {
+        bytes memory op1Len = abi.encodePacked(op1.length);
+        bytes memory op2Len = abi.encodePacked(op2.length);
+        bytes memory data = bytes.concat(op1Len, op2Len, op1, op2);
+
+        return callToPrec(ADD_ADDR, data);
+    }
+
+    function callToPrec(address precAddress, bytes memory data)
+        internal
+        view
+        returns (bytes memory)
+    {
+        (bool ok, bytes memory result) = address(precAddress).staticcall{gas: 50000}(data);
+        
+        require(ok);
+
+        return result;
+    }
+}
