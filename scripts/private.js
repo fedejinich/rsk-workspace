@@ -8,7 +8,7 @@ const hre = require("hardhat");
 
 async function main() {
     const factory = await hre.ethers.getContractFactory("PrivateBallot")
-    const pb = await factory.deploy({ gasLimit: 6000000 })
+    const fhBallot = await factory.deploy({ gasLimit: 6000000 })
 
     console.log("contract deployed")
 
@@ -16,7 +16,7 @@ async function main() {
 
     for (const p in proposals) {
         console.log("adding proposal: " + p)
-        await pb.addProposal(p, { gasLimit: 6000000 })
+        await fhBallot.addProposal(p, { gasLimit: 6000000 })
     }
 
     console.log("waiting for votes")
@@ -24,17 +24,18 @@ async function main() {
         console.log("voting")
         console.log(v)
 
-        await pb.vote(v, {gasLimit:6000000})
+        const r = await fhBallot.vote(v, {gasLimit:6000000})
+        await r.wait() 
     }
 
     console.log("closing ballot")
     
-    console.log("counting votes")
+    // console.log("counting votes")
     
-    const r1 = await pb.voteCount()
-    const receipt1 = await r1.wait()
+    //const r1 = await fhBallot.voteCount()
+    //const rec1 = await r1.wait()
     
-    console.log("picking winner proposal")
+    // console.log("picking winner proposal")
     
     // const r2 = await pb.winner()
     // const receipt2 = await r2.wait()    
