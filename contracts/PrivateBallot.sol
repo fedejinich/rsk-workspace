@@ -5,7 +5,7 @@ contract PrivateBallot {
     // fields
     string public cause;
     mapping(address => Proposal) private proposals;
-    address[] proposalsAux;
+    address[] private proposalsAux;
 
     mapping(address => PrivateVote) private votes;
     address[] private votesAux;
@@ -28,8 +28,10 @@ contract PrivateBallot {
     // events
     event NewProposal(address, string);
     event NewVote(address);
-    event Winner(string, uint256);
+    event Winner();
+    //event Winner(string, uint256);
     event VoteCount(uint64[]);
+    event Dec(bytes);
 
     // consts
     address ADD_ADDR = 0x0000000000000000000000000000000001000011;
@@ -39,6 +41,9 @@ contract PrivateBallot {
     function addProposal(string memory p) public {
         Proposal memory prop = Proposal(p, true);
         proposals[msg.sender] = prop;
+        proposalsAux.push(msg.sender);
+
+        require(proposalsAux.length > 0);
 
         emit NewProposal(msg.sender, prop.proposal);
     }
@@ -48,25 +53,46 @@ contract PrivateBallot {
 
         PrivateVote memory v = PrivateVote(encryptedVote, true);
         votes[msg.sender] = v;
+        votesAux.push(msg.sender);
 
         emit NewVote(msg.sender);
     }
 
     function voteCount()
-        public 
-        returns (
+        internal 
+        view
+        returns (bytes memory)
             /*onlyOwner*/
-            uint64[] memory
-        )
+            //uint64[] memory
     {
-        bytes memory encryptedResult;
-        for (uint256 i = 0; i < votesAux.length; i++) {
+        require(votesAux.length != 0, "no votes"); // todo(fedejinich) remove this
+
+        // transcipher from PASTA to BFV (accumulate over the first vote)
+        uint64[] memory vp = votes[votesAux[0]].vote;
+        bytes memory encryptedResult = callToPrec(
+            TRANS_ADDR,
+            transcipherData(vp)
+        );
+
+        if (votesAux.length == 1) {
+            // the result is an array of the total amount of
+            // votes indexed by proposal
+            //  P1 P2 P3 P4
+            // [ 1, 4, 6, 2 ]
+            bytes memory r = decrypt(encryptedResult);
+
+            return r;
+        }
+
+        for (uint256 i = 1; i < votesAux.length; i++) {
             address addr = votesAux[i];
             uint64[] memory votePasta = votes[addr].vote;
 
             // transcipher from PASTA to BFV
-            bytes memory voteBfv = callToPrec(TRANS_ADDR,
-                                              transcipherData(votePasta));
+            bytes memory voteBfv = callToPrec(
+                TRANS_ADDR,
+                transcipherData(votePasta)
+            );
 
             // count encytrpted votes
             encryptedResult = add(encryptedResult, voteBfv);
@@ -76,16 +102,20 @@ contract PrivateBallot {
         // votes indexed by proposal
         //  P1 P2 P3 P4
         // [ 1, 4, 6, 2 ]
-        uint64[] memory result = decrypt(encryptedResult);
+        bytes memory d = decrypt(encryptedResult);
 
-        emit VoteCount(result);
-
-        return result;
+        return d;
     }
 
-    function winner() external returns (uint256) {
+    //function winner() external returns (uint256) {
+    function winner() public view returns (bool) {
         require(proposalsAux.length > 0, "there isn't any proposal");
-        uint64[] memory results = voteCount();
+
+        voteCount();
+
+        return true;
+        /*
+        uint64[] memory results = bytesToUint64Array(vc);
 
         uint256 index = 0;
         uint256 maxValue = 0;
@@ -101,6 +131,7 @@ contract PrivateBallot {
         emit Winner(proposals[addr].proposal, maxValue);
 
         return maxValue; // todo(fedejinich) it can be the proposal string
+        */
     }
 
     function add(bytes memory op1, bytes memory op2)
@@ -108,21 +139,23 @@ contract PrivateBallot {
         view
         returns (bytes memory)
     {
+        /*
         bytes memory op1Len = abi.encodePacked(op1.length);
         bytes memory op2Len = abi.encodePacked(op2.length);
         bytes memory data = bytes.concat(op1Len, op2Len, op1, op2);
+        */
+
+        bytes memory data = bytes.concat(op1, op2);
 
         return callToPrec(ADD_ADDR, data);
     }
 
-    function decrypt(bytes memory e) 
-        public
-        view
-        returns (uint64[] memory)
-    {
+    function decrypt(bytes memory e) public view returns (bytes memory) {
+    //function decrypt(bytes memory e) public view returns (uint64[] memory) {
         bytes memory dec = callToPrec(DECRYPT_ADDR, e);
+        return dec;
 
-        return bytesToUint64Array(dec);
+        //return bytesToUint64Array(dec);
     }
 
     /*
@@ -144,15 +177,15 @@ contract PrivateBallot {
     }
     */
 
-    function bytesToUint64Array(bytes memory b) 
+    function bytesToUint64Array(bytes memory b)
         internal
         pure
         returns (uint64[] memory)
     {
         // bytes to uint[]
         uint64[] memory result;
-        uint j = 0;
-        for (uint i = 0; i < b.length; i = i + 32) {
+        uint256 j = 0;
+        for (uint256 i = 0; i < b.length; i = i + 32) {
             uint64 r = toUint64(b, i);
             result[j] = r;
             j++;
@@ -161,7 +194,7 @@ contract PrivateBallot {
         return result;
     }
 
-    function toUint64(bytes memory _bytes, uint _start)
+    function toUint64(bytes memory _bytes, uint256 _start)
         internal
         pure
         returns (uint64)
@@ -199,7 +232,7 @@ contract PrivateBallot {
         returns (bytes memory)
     {
         (bool ok, bytes memory result) = address(precAddress).staticcall{
-            gas: 50000
+            gas: 1
         }(data);
 
         require(ok);
@@ -207,7 +240,11 @@ contract PrivateBallot {
         return result;
     }
 
-    function transcipherData(uint64[] memory op) internal pure returns (bytes memory) {
+    function transcipherData(uint64[] memory op)
+        internal
+        pure
+        returns (bytes memory)
+    {
         bytes memory opBytes = abi.encodePacked(op);
         bytes memory opBytesLen = abi.encodePacked(opBytes.length);
 
@@ -217,11 +254,9 @@ contract PrivateBallot {
         // bytes memory pastaSKBytes = pastaSKs[msg.sender];
         // bytes memory pastaSKBytesLen = abi.encodePacked(pastaSKBytes.length);
 
-    //    return bytes.concat(opBytesLen, pastaSKBytesLen, opBytes, pastaSKBytes);
+        //    return bytes.concat(opBytesLen, pastaSKBytesLen, opBytes, pastaSKBytes);
         return bytes.concat(opBytesLen, opBytes);
     }
-
-
 
     /*
     // shows the real vote if it's the same address

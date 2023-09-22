@@ -7,6 +7,7 @@
 const hre = require("hardhat");
 
 async function main() {
+    const signers = await hre.ethers.getSigners()
     const factory = await hre.ethers.getContractFactory("PrivateBallot")
     const fhBallot = await factory.deploy({ gasLimit: 6000000 })
 
@@ -14,30 +15,54 @@ async function main() {
 
     const proposals = ["prop1", "prop2", "prop3", "prop4"]
 
-    for (const p in proposals) {
+    for (let i = 0; i < proposals.length; i++) {
+        const p = proposals[i];
         console.log("adding proposal: " + p)
-        await fhBallot.addProposal(p, { gasLimit: 6000000 })
+        const re = await fhBallot.connect(signers[i])
+            .addProposal(p, { gasLimit: 6000000 })
+        const re2 = await re.wait()
+
+        try {
+            const parsedLog = fhBallot.interface.parseLog(re2.logs[0]);
+            console.log("event " + parsedLog.fragment.name + "(" +
+                parsedLog.args[0] + ", " + parsedLog.args[1] + ")");
+        } catch (error) {
+            console.log("Unable to decode log");
+        }
     }
 
     console.log("waiting for votes")
-    for (const v of generateVotes()) {
+    const votes = generateVotes();
+    for (let i = 0; i < votes.length; i++) {
+        // for (let i = 0; i < 1; i++) {
         console.log("voting")
-        console.log(v)
+        // console.log("encrypted vote [" + votes[i].vote + "]")
 
-        const r = await fhBallot.vote(v, {gasLimit:6000000})
-        await r.wait() 
+        const voteResponse = await fhBallot.connect(signers[i])
+            .vote(votes[i], { gasLimit: 6000000 })
+        const voteReceipt = await voteResponse.wait()
+
+        try {
+            const parsedLog = fhBallot.interface.parseLog(voteReceipt.logs[0]);
+            console.log("event " + parsedLog.fragment.name + "(" + parsedLog.args[0] + ")");
+        } catch (error) {
+            console.log("Unable to decode log");
+        }
     }
 
     console.log("closing ballot")
-    
+
     // console.log("counting votes")
-    
-    //const r1 = await fhBallot.voteCount()
-    //const rec1 = await r1.wait()
-    
-    // console.log("picking winner proposal")
-    
-    // const r2 = await pb.winner()
+
+    // const ok = await fhBallot.voteCount({ gasLimit: 6800000 })
+
+    // console.log(ok)
+
+    console.log("picking winner proposal")
+
+    const res = await fhBallot.winner({ gasLimit: 6_800_000 })
+
+    console.log(res)
     // const receipt2 = await r2.wait()    
     // console.log("winner proposal")
     // const currentTimestampInSeconds = Math.round(Date.now() / 1000);
