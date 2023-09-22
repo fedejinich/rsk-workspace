@@ -49,7 +49,12 @@ contract PrivateBallot {
     }
 
     function vote(uint64[] calldata encryptedVote) public {
-        //require(!votes[msg.sender].exists, "Address already voted");
+        require(!votes[msg.sender].exists, "Address already voted");
+
+        //bytes memory voteBfv = callToPrec(
+        //    TRANS_ADDR,
+        //    transcipherData(encryptedVote)
+        //);
 
         PrivateVote memory v = PrivateVote(encryptedVote, true);
         votes[msg.sender] = v;
@@ -59,11 +64,12 @@ contract PrivateBallot {
     }
 
     function voteCount()
-        internal 
+        public 
         view
-        returns (bytes memory)
-            /*onlyOwner*/
-            //uint64[] memory
+        returns (
+            bytes memory /*onlyOwner*/
+        )
+    //uint64[] memory
     {
         require(votesAux.length != 0, "no votes"); // todo(fedejinich) remove this
 
@@ -102,18 +108,32 @@ contract PrivateBallot {
         // votes indexed by proposal
         //  P1 P2 P3 P4
         // [ 1, 4, 6, 2 ]
-        bytes memory d = decrypt(encryptedResult);
+        return encryptedResult;
+    }
 
-        return d;
+    function reverse(uint64[] memory original)
+        public
+        pure
+        returns (uint64[] memory)
+    {
+        uint64[] memory reversed = new uint64[](original.length);
+
+        for (uint256 i = 0; i < original.length; i++) {
+            reversed[i] = original[original.length - 1 - i];
+        }
+
+        return reversed;
     }
 
     //function winner() external returns (uint256) {
-    function winner() public view returns (bool) {
+    function winner() public view returns (uint64[] memory) {
         require(proposalsAux.length > 0, "there isn't any proposal");
 
-        voteCount();
+        bytes memory vc = voteCount();
+        bytes memory dec = callToPrec(DECRYPT_ADDR, vc);
+        uint64[] memory decrypted = bytesToUint64Array(dec);
 
-        return true;
+        return decrypted;
         /*
         uint64[] memory results = bytesToUint64Array(vc);
 
@@ -150,48 +170,56 @@ contract PrivateBallot {
         return callToPrec(ADD_ADDR, data);
     }
 
+    function bytesToUint64Array2(bytes memory data)
+        public
+        pure
+        returns (uint64[] memory)
+    {
+        // Ensure that the input bytes length is a multiple of 8
+        require(data.length % 8 == 0, "bytes length must be a multiple of 8");
+
+        uint64[] memory results = new uint64[](data.length / 8);
+
+        for (uint256 i = 0; i < data.length / 8; i++) {
+            uint64 value;
+
+            assembly {
+                // Load 8 bytes from the data into the value
+                value := mload(add(data, add(0x20, mul(i, 8))))
+            }
+
+            results[i] = value;
+        }
+
+        return results;
+    }
+
     function decrypt(bytes memory e) public view returns (bytes memory) {
-    //function decrypt(bytes memory e) public view returns (uint64[] memory) {
+        //function decrypt(bytes memory e) public view returns (uint64[] memory) {
         bytes memory dec = callToPrec(DECRYPT_ADDR, e);
         return dec;
 
         //return bytesToUint64Array(dec);
     }
 
-    /*
-    function bytesToUintArray(bytes memory b) 
-        internal
-        pure
-        returns (uint[] memory)
-    {
-        // bytes to uint[]
-        uint[] memory result;
-        uint j = 0;
-        for (uint i = 0; i < b.length; i = i + 32) {
-            uint r = toUint256(b, i);
-            result[j] = r;
-            j++;
-        }
-
-        return result;
-    }
-    */
-
     function bytesToUint64Array(bytes memory b)
         internal
         pure
         returns (uint64[] memory)
     {
-        // bytes to uint[]
-        uint64[] memory result;
+        require(b.length % 8 == 0, "should be multiple of 8");
+
+        uint256 size = b.length / 8;
+        uint64[] memory result = new uint64[](size);
+
         uint256 j = 0;
-        for (uint256 i = 0; i < b.length; i = i + 32) {
+        for (uint256 i = 0; i < b.length; i = i + 8) {
             uint64 r = toUint64(b, i);
             result[j] = r;
             j++;
         }
 
-        return result;
+        return reverse(result);
     }
 
     function toUint64(bytes memory _bytes, uint256 _start)
