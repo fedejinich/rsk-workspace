@@ -28,8 +28,7 @@ contract PrivateBallot {
     // events
     event NewProposal(address, string);
     event NewVote(address);
-    event Winner();
-    //event Winner(string, uint256);
+    event Winner(string, uint256);
     event VoteCount(uint64[]);
     event Dec(bytes);
 
@@ -64,7 +63,7 @@ contract PrivateBallot {
     }
 
     function voteCount()
-        public 
+        public
         view
         returns (
             bytes memory /*onlyOwner*/
@@ -126,17 +125,14 @@ contract PrivateBallot {
     }
 
     //function winner() external returns (uint256) {
-    function winner() public view returns (uint64[] memory) {
+    function winner() public view returns (uint256[] memory) {
         require(proposalsAux.length > 0, "there isn't any proposal");
 
         bytes memory vc = voteCount();
         bytes memory dec = callToPrec(DECRYPT_ADDR, vc);
-        uint64[] memory decrypted = bytesToUint64Array(dec);
+        uint64[] memory results = bytesToUint64Array(dec);
 
-        return decrypted;
-        /*
-        uint64[] memory results = bytesToUint64Array(vc);
-
+        
         uint256 index = 0;
         uint256 maxValue = 0;
         for (uint256 i = 0; i < results.length; i++) {
@@ -148,10 +144,13 @@ contract PrivateBallot {
 
         address addr = proposalsAux[index];
 
-        emit Winner(proposals[addr].proposal, maxValue);
+        uint256[] memory foo = new uint256[](2);
+        foo[0] = index;
+        foo[1] = maxValue;
 
-        return maxValue; // todo(fedejinich) it can be the proposal string
-        */
+        //emit Winner(proposals[addr].proposal, maxValue);
+        
+        return foo;
     }
 
     function add(bytes memory op1, bytes memory op2)
