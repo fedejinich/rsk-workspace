@@ -4,6 +4,7 @@ pragma solidity ^0.8.18;
 // todo(fedejinich) add feature to show the vote only to the owner
 
 contract PrivateBallot {
+    bool open = true;
     string public cause;
     mapping(address => Proposal) private proposals;
     address[] private proposalsAux;
@@ -28,6 +29,7 @@ contract PrivateBallot {
     event Winner(string, uint256);
     event VoteCount(uint64[]);
     event Vote(bytes);
+    event ClosedBallot();
 
     // consts
     address ADD_ADDR = 0x0000000000000000000000000000000001000011;
@@ -56,7 +58,7 @@ contract PrivateBallot {
 
     // todo(fedejinich) restric this to only owner
     function voteCount() public view returns (bytes memory) {
-        require(votesAux.length != 0, "no votes"); // todo(fedejinich) remove this
+        require(open == false, "ballot still open");
 
         // transcipher from PASTA to BFV (accumulate over the first vote)
         uint64[] memory encryptedVote = votes[votesAux[0]].vote;
@@ -90,6 +92,13 @@ contract PrivateBallot {
         return encryptedResult;
     }
 
+    function closeBallot() public {
+        require(open == true, "ballot is already closed");
+        open = false;
+        
+        emit ClosedBallot();
+    }
+
     function winner() public returns (uint256[] memory) {
         require(proposalsAux.length > 0, "there isn't any proposal");
 
@@ -110,12 +119,6 @@ contract PrivateBallot {
         address addr = proposalsAux[index];
 
         emit Winner(proposals[addr].proposal, maxValue);
-
-        uint256[] memory foo = new uint256[](2);
-        foo[0] = index;
-        foo[1] = maxValue;
-
-        return foo;
     }
 
     function add(bytes memory op1, bytes memory op2)

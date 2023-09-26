@@ -10,7 +10,7 @@ async function main() {
     const signers = await hre.ethers.getSigners()
     const factory = await hre.ethers.getContractFactory("PrivateBallot")
 
-    const fhBallot = await factory.deploy({ gasLimit: 6000000 })
+    const fhBallot = await factory.deploy({ gasLimit: 6_000_000 })
     console.log("Contract successfully deployed to address:", fhBallot.address);
 
     const proposals = ["prop1", "prop2", "prop3", "prop4"]
@@ -19,7 +19,7 @@ async function main() {
         const p = proposals[i];
         console.log(`Adding proposal: ${p}`);
         const re = await fhBallot.connect(signers[i])
-            .addProposal(p, { gasLimit: 6000000 })
+            .addProposal(p, { gasLimit: 6_000_000 })
         const re2 = await re.wait()
 
         try {
@@ -35,7 +35,7 @@ async function main() {
     for (let i = 0; i < votes.length; i++) {
         console.log(`Casting vote #${i + 1}`);
         const voteResponse = await fhBallot.connect(signers[i])
-            .vote(votes[i], { gasLimit: 6000000 })
+            .vote(votes[i], { gasLimit: 6_000_000 })
         const voteReceipt = await voteResponse.wait()
 
         try {
@@ -46,7 +46,20 @@ async function main() {
         }
     }
 
-    console.log("Closing ballot and determining the winning proposal...");
+    console.log("Closing ballot")
+
+    const res0 = await fhBallot.closeBallot({ gasLimit: 6_800_000 })
+    const rec0 = await res0.wait()
+    
+    try {
+        const parsedLog = fhBallot.interface.parseLog(rec0.logs[0]);
+        console.log(`Event emitted: ${parsedLog.fragment.name}()`);
+    } catch (error) {
+        console.error("Error decoding log:", error);
+    }
+    
+    console.log("Determining the winning proposal...");
+
     const res = await fhBallot.winner({ gasLimit: 6_800_000 })
     const rec = await res.wait()
 
