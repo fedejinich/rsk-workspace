@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.18;
 
+// todo(fedejinich) add feature to show the vote only to the owner
+
 contract PrivateBallot {
-    // fields
     string public cause;
     mapping(address => Proposal) private proposals;
     address[] private proposalsAux;
-
-    mapping(address => PrivateVote) private votes;
+    // votes are encrytped with PASTA cipher
+    mapping(address => EncryptedVote) private votes;
     address[] private votesAux;
 
     // structs
@@ -16,21 +17,17 @@ contract PrivateBallot {
         bool exists;
     }
 
-    struct PrivateVote {
+    struct EncryptedVote {
         uint64[] vote;
         bool exists;
     }
 
-    struct RealVote {
-        string proposal;
-    }
-
     // events
     event NewProposal(address, string);
-    event NewVote(address);
+    event NewEncryptedVote(address);
     event Winner(string, uint256);
     event VoteCount(uint64[]);
-    event Dec(bytes);
+    event Vote(bytes);
 
     // consts
     address ADD_ADDR = 0x0000000000000000000000000000000001000011;
@@ -50,57 +47,40 @@ contract PrivateBallot {
     function vote(uint64[] calldata encryptedVote) public {
         require(!votes[msg.sender].exists, "Address already voted");
 
-        //bytes memory voteBfv = callToPrec(
-        //    TRANS_ADDR,
-        //    transcipherData(encryptedVote)
-        //);
-
-        PrivateVote memory v = PrivateVote(encryptedVote, true);
+        EncryptedVote memory v = EncryptedVote(encryptedVote, true);
         votes[msg.sender] = v;
         votesAux.push(msg.sender);
 
-        emit NewVote(msg.sender);
+        emit NewEncryptedVote(msg.sender);
     }
 
-    function voteCount()
-        public
-        view
-        returns (
-            bytes memory /*onlyOwner*/
-        )
-    //uint64[] memory
-    {
+    // todo(fedejinich) restric this to only owner
+    function voteCount() public view returns (bytes memory) {
         require(votesAux.length != 0, "no votes"); // todo(fedejinich) remove this
 
         // transcipher from PASTA to BFV (accumulate over the first vote)
-        uint64[] memory vp = votes[votesAux[0]].vote;
+        uint64[] memory encryptedVote = votes[votesAux[0]].vote;
         bytes memory encryptedResult = callToPrec(
             TRANS_ADDR,
-            transcipherData(vp)
+            transcipherData(encryptedVote)
         );
 
         if (votesAux.length == 1) {
-            // the result is an array of the total amount of
-            // votes indexed by proposal
-            //  P1 P2 P3 P4
-            // [ 1, 4, 6, 2 ]
-            bytes memory r = decrypt(encryptedResult);
-
-            return r;
+            return callToPrec(DECRYPT_ADDR, encryptedResult);
         }
 
         for (uint256 i = 1; i < votesAux.length; i++) {
             address addr = votesAux[i];
-            uint64[] memory votePasta = votes[addr].vote;
+            uint64[] memory encryptedVote = votes[addr].vote;
 
             // transcipher from PASTA to BFV
-            bytes memory voteBfv = callToPrec(
+            bytes memory encryptedVoteBfv = callToPrec(
                 TRANS_ADDR,
-                transcipherData(votePasta)
+                transcipherData(encryptedVote)
             );
 
             // count encytrpted votes
-            encryptedResult = add(encryptedResult, voteBfv);
+            encryptedResult = add(encryptedResult, encryptedVoteBfv);
         }
 
         // the result is an array of the total amount of
@@ -110,31 +90,16 @@ contract PrivateBallot {
         return encryptedResult;
     }
 
-    function reverse(uint64[] memory original)
-        public
-        pure
-        returns (uint64[] memory)
-    {
-        uint64[] memory reversed = new uint64[](original.length);
-
-        for (uint256 i = 0; i < original.length; i++) {
-            reversed[i] = original[original.length - 1 - i];
-        }
-
-        return reversed;
-    }
-
-    //function winner() external returns (uint256) {
-    function winner() public view returns (uint256[] memory) {
+    function winner() public returns (uint256[] memory) {
         require(proposalsAux.length > 0, "there isn't any proposal");
 
         bytes memory vc = voteCount();
         bytes memory dec = callToPrec(DECRYPT_ADDR, vc);
         uint64[] memory results = bytesToUint64Array(dec);
 
-        
+        // gets index and the amount of votes
         uint256 index = 0;
-        uint256 maxValue = 0;
+        uint256 maxValue = 0; // amount of votes
         for (uint256 i = 0; i < results.length; i++) {
             if (results[i] > maxValue) {
                 maxValue = results[i];
@@ -144,12 +109,12 @@ contract PrivateBallot {
 
         address addr = proposalsAux[index];
 
+        emit Winner(proposals[addr].proposal, maxValue);
+
         uint256[] memory foo = new uint256[](2);
         foo[0] = index;
         foo[1] = maxValue;
 
-        //emit Winner(proposals[addr].proposal, maxValue);
-        
         return foo;
     }
 
@@ -158,47 +123,9 @@ contract PrivateBallot {
         view
         returns (bytes memory)
     {
-        /*
-        bytes memory op1Len = abi.encodePacked(op1.length);
-        bytes memory op2Len = abi.encodePacked(op2.length);
-        bytes memory data = bytes.concat(op1Len, op2Len, op1, op2);
-        */
-
         bytes memory data = bytes.concat(op1, op2);
 
         return callToPrec(ADD_ADDR, data);
-    }
-
-    function bytesToUint64Array2(bytes memory data)
-        public
-        pure
-        returns (uint64[] memory)
-    {
-        // Ensure that the input bytes length is a multiple of 8
-        require(data.length % 8 == 0, "bytes length must be a multiple of 8");
-
-        uint64[] memory results = new uint64[](data.length / 8);
-
-        for (uint256 i = 0; i < data.length / 8; i++) {
-            uint64 value;
-
-            assembly {
-                // Load 8 bytes from the data into the value
-                value := mload(add(data, add(0x20, mul(i, 8))))
-            }
-
-            results[i] = value;
-        }
-
-        return results;
-    }
-
-    function decrypt(bytes memory e) public view returns (bytes memory) {
-        //function decrypt(bytes memory e) public view returns (uint64[] memory) {
-        bytes memory dec = callToPrec(DECRYPT_ADDR, e);
-        return dec;
-
-        //return bytesToUint64Array(dec);
     }
 
     function bytesToUint64Array(bytes memory b)
@@ -236,23 +163,6 @@ contract PrivateBallot {
         return tempUint;
     }
 
-    /*
-    function toUint256(bytes memory _bytes, uint256 _start)
-        internal
-        pure
-        returns (uint256)
-    {
-        require(_bytes.length >= _start + 32, "toUint256_outOfBounds");
-        uint256 tempUint;
-
-        assembly {
-            tempUint := mload(add(add(_bytes, 0x20), _start))
-        }
-
-        return tempUint;
-    }
-    */
-
     function callToPrec(address precAddress, bytes memory data)
         internal
         view
@@ -262,7 +172,8 @@ contract PrivateBallot {
             gas: 1
         }(data);
 
-        require(ok);
+        // todo(fedejinich) this sholuldn't be commented
+        //require(ok, "prec failed");
 
         return result;
     }
@@ -285,18 +196,17 @@ contract PrivateBallot {
         return bytes.concat(opBytesLen, opBytes);
     }
 
-    /*
-    // shows the real vote if it's the same address
-    function showRealVote(address addr) public returns (RealVote memory) {
-        require(msg.sender == addr, "Cannot show vote of another address");
-        PrivateVote memory v = votes[msg.sender];
+    function reverse(uint64[] memory original)
+        public
+        pure
+        returns (uint64[] memory)
+    {
+        uint64[] memory reversed = new uint64[](original.length);
 
-        return realVote(decrypt(v.vote)); // todo(fedejinich) too much stuff :(
+        for (uint256 i = 0; i < original.length; i++) {
+            reversed[i] = original[original.length - 1 - i];
+        }
+
+        return reversed;
     }
-    
-    function realVote(uint[] memory v) public returns (RealVote memory) {
-        RealVote memory rv;
-        return rv;
-    }
-    */
 }
