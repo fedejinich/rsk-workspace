@@ -9,86 +9,58 @@ const hre = require("hardhat");
 async function main() {
     const signers = await hre.ethers.getSigners()
     const factory = await hre.ethers.getContractFactory("PrivateBallot")
-    const fhBallot = await factory.deploy({ gasLimit: 6000000 })
 
-    console.log("contract deployed")
+    const fhBallot = await factory.deploy({ gasLimit: 6000000 })
+    console.log("Contract successfully deployed to address:", fhBallot.address);
 
     const proposals = ["prop1", "prop2", "prop3", "prop4"]
 
     for (let i = 0; i < proposals.length; i++) {
         const p = proposals[i];
-        console.log("adding proposal: " + p)
+        console.log(`Adding proposal: ${p}`);
         const re = await fhBallot.connect(signers[i])
             .addProposal(p, { gasLimit: 6000000 })
         const re2 = await re.wait()
 
         try {
             const parsedLog = fhBallot.interface.parseLog(re2.logs[0]);
-            console.log("event " + parsedLog.fragment.name + "(" +
-                parsedLog.args[0] + ", " + parsedLog.args[1] + ")");
+            console.log(`Event emitted: ${parsedLog.fragment.name}(${parsedLog.args.join(', ')})`);
         } catch (error) {
-            console.log("Unable to decode log");
+            console.error("Error decoding log:", error);
         }
     }
 
-    console.log("waiting for votes")
+    console.log("Waiting for votes...");
     const votes = generateVotes();
     for (let i = 0; i < votes.length; i++) {
-        // for (let i = 0; i < 1; i++) {
-        console.log("voting")
-        // console.log("encrypted vote [" + votes[i].vote + "]")
-
+        console.log(`Casting vote #${i + 1}`);
         const voteResponse = await fhBallot.connect(signers[i])
             .vote(votes[i], { gasLimit: 6000000 })
         const voteReceipt = await voteResponse.wait()
 
         try {
             const parsedLog = fhBallot.interface.parseLog(voteReceipt.logs[0]);
-            console.log("event " + parsedLog.fragment.name + "(" + parsedLog.args[0] + ")");
+            console.log(`Event emitted: ${parsedLog.fragment.name}(${parsedLog.args.join(', ')})`);
         } catch (error) {
-            console.log("Unable to decode log");
+            console.error("Error decoding log:", error);
         }
     }
 
-    console.log("closing ballot")
-
-    // console.log("counting votes")
-
-    // const ok = await fhBallot.voteCount({ gasLimit: 6800000 })
-
-    // console.log(ok)
-
-    console.log("picking winner proposal")
-
+    console.log("Closing ballot and determining the winning proposal...");
     const res = await fhBallot.winner({ gasLimit: 6_800_000 })
+    const rec = await res.wait()
 
-    console.log(res)
-    // const receipt2 = await r2.wait()    
-    // console.log("winner proposal")
-    // const currentTimestampInSeconds = Math.round(Date.now() / 1000);
-    // const unlockTime = currentTimestampInSeconds + 60;
-
-    // const lockedAmount = hre.ethers.parseEther("0.001");
-
-    // const lock = await hre.ethers.deployContract("Lock", [unlockTime], {
-    //   value: lockedAmount,
-    // });
-    //
-    // await lock.waitForDeployment();
-    //
-    // console.log(
-    //   `Lock with ${ethers.formatEther(
-    //     lockedAmount
-    //   )}ETH and unlock timestamp ${unlockTime} deployed to ${lock.target}`
-    // );
+    try {
+        const parsedLog = fhBallot.interface.parseLog(rec.logs[0]);
+        console.log(`Event emitted: ${parsedLog.fragment.name}(${parsedLog.args.join(', ')})`);
+    } catch (error) {
+        console.error("Error decoding log:", error);
+    }
 }
+
 
 function generateVotes() {
     const votesJson = require('/Users/fedejinich/Projects/rsk-workspace/scripts/votes.json');
-
-    console.log("generating votes")
-
-    // console.log(votesJson.votesBfv)
 
     return votesJson.votesPasta
 }
