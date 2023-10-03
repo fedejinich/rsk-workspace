@@ -1,12 +1,12 @@
 Operation,Time (ms),Gas
-AddProposal,66,107609
-AddProposal,58,92609
-AddProposal,82,92609
-AddProposal,72,92609
-Vote,59,143155
-Vote,48,128155
-Vote,31,128155
-Vote,43,128155
-Vote,42,128155
-CloseBallot,92,13864
-DetermineWinner,152877,84228
+AddProposal,140,107609
+AddProposal,70,92609
+AddProposal,30,92609
+AddProposal,35,92609
+Vote,43,143155
+Vote,27,128155
+Vote,27,128155
+Vote,50,128155
+Vote,26,128155
+CloseBallot,38,13864
+DetermineWinner,170595,84228
