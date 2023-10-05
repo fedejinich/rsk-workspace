@@ -9,7 +9,11 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@ethereumjs/tx": "^5.0.0",
+    "@ethereumjs/util": "^9.0.0",
     "@nomicfoundation/hardhat-toolbox": "^3.0.0",
+    "axios": "^1.5.1",
+    "ethereumjs-util": "^7.1.5",
     "hardhat": "^2.17.2"
   }
 }

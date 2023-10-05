@@ -11,6 +11,7 @@ contract PrivateBallot2 {
     // votes are encrytped with PASTA cipher
     mapping(address => EncryptedVote) private votes;
     address[] private votesAux;
+    bytes encryptedResult;
 
     // structs
     struct Proposal {
@@ -26,7 +27,9 @@ contract PrivateBallot2 {
     // events
     event NewProposal(address, string);
     event NewEncryptedVote(address);
+    event NewEncryptedVote2(address);
     event Winner(string, uint256);
+    event Winner2(string, uint256);
     event VoteCount(uint64[]);
     event Vote(bytes);
     event ClosedBallot();
@@ -46,7 +49,7 @@ contract PrivateBallot2 {
         emit NewProposal(msg.sender, prop.proposal);
     }
 
-    function vote(bytes calldata encryptedVote) public {
+    function vote(bytes memory encryptedVote) public {
         require(!votes[msg.sender].exists, "Address already voted");
 
         EncryptedVote memory v = EncryptedVote(encryptedVote, true);
@@ -56,15 +59,35 @@ contract PrivateBallot2 {
         emit NewEncryptedVote(msg.sender);
     }
 
+    function vote2(bytes memory encryptedVote) public {
+        require(!votes[msg.sender].exists, "Address already voted");
+
+        EncryptedVote memory v = EncryptedVote(encryptedVote, true);
+        votes[msg.sender] = v;
+        votesAux.push(msg.sender);
+
+        // 'initialize' encryptedResult
+        if (encryptedResult.length == 0) {
+            encryptedResult = encryptedVote;
+            emit NewEncryptedVote(msg.sender);
+
+            return;
+        }
+
+        encryptedResult = add(encryptedResult, encryptedVote);
+
+        emit NewEncryptedVote2(msg.sender);
+    }
+
     // todo(fedejinich) restric this to only owner
     function voteCount() public view returns (bytes memory) {
         require(open == false, "ballot still open");
 
         // gets the hash of the encrypted vote
-        bytes memory encryptedResult = votes[votesAux[0]].vote;
+        bytes memory result = votes[votesAux[0]].vote;
 
         if (votesAux.length == 1) {
-            return callToPrec(DECRYPT_ADDR, encryptedResult);
+            return callToPrec(DECRYPT_ADDR, result);
         }
 
         for (uint256 i = 1; i < votesAux.length; i++) {
@@ -72,20 +95,20 @@ contract PrivateBallot2 {
             bytes memory encryptedVote = votes[addr].vote;
 
             // count encytrpted votes
-            encryptedResult = add(encryptedResult, encryptedVote);
+            result = add(result, encryptedVote);
         }
 
         // the result is an array of the total amount of
         // votes indexed by proposal
         //  P1 P2 P3 P4
         // [ 1, 4, 6, 2 ]
-        return encryptedResult;
+        return result;
     }
 
     function closeBallot() public {
         require(open == true, "ballot is already closed");
         open = false;
-        
+
         emit ClosedBallot();
     }
 
@@ -110,6 +133,29 @@ contract PrivateBallot2 {
 
         emit Winner(proposals[addr].proposal, maxValue);
     }
+
+    function winner2() public {
+        require(proposalsAux.length > 0, "there isn't any proposal");
+
+        bytes memory dec = callToPrec(DECRYPT_ADDR, encryptedResult);
+        uint64[] memory results = bytesToUint64Array(dec);
+
+        // gets index and the amount of votes
+        uint256 index = 0;
+        uint256 maxValue = 0; // amount of votes
+        for (uint256 i = 0; i < results.length; i++) {
+            if (results[i] > maxValue) {
+                maxValue = results[i];
+                index = uint256(i);
+            }
+        }
+
+        address addr = proposalsAux[index];
+
+        emit Winner2(proposals[addr].proposal, maxValue);
+    }
+
+
 
     function add(bytes memory op1, bytes memory op2)
         internal
@@ -169,24 +215,6 @@ contract PrivateBallot2 {
         //require(ok, "prec failed");
 
         return result;
-    }
-
-    function transcipherData(uint64[] memory op)
-        internal
-        pure
-        returns (bytes memory)
-    {
-        bytes memory opBytes = abi.encodePacked(op);
-        bytes memory opBytesLen = abi.encodePacked(opBytes.length);
-
-        // require(op.length * 8 == opBytes.length, "length should be 8 size the original one");
-        // require(opBytes.length == 16, "ok");
-
-        // bytes memory pastaSKBytes = pastaSKs[msg.sender];
-        // bytes memory pastaSKBytesLen = abi.encodePacked(pastaSKBytes.length);
-
-        //    return bytes.concat(opBytesLen, pastaSKBytesLen, opBytes, pastaSKBytes);
-        return bytes.concat(opBytesLen, opBytes);
     }
 
     function reverse(uint64[] memory original)
