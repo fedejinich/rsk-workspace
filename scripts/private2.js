@@ -1,8 +1,8 @@
 // will compile your contracts, add the hardhat runtime environment's members to the
 // we require the hardhat runtime environment explicitly here. this is optional
 // but useful for running the script in a standalone fashion through `node <script>`.
-    //
-    // you can also run a script with `npx hardhat run <script>`. if you do that, hardhat
+//
+// you can also run a script with `npx hardhat run <script>`. if you do that, hardhat
 // global scope, and execute the script.
 // const hre = require("hardhat");
 const hre = require('hardhat');
@@ -26,7 +26,7 @@ async function main() {
     // const deploytime = date.now() - startdeploy;
     // const deploygas = a.gasused.tonumber();
     // benchmarks.push({ operation: 'deploy', time: deploytime });//, gas: deploygas });
-    console.log("contract successfully deployed to address:", fhBallot.address);
+    console.log("contract successfully deployed to address:", await fhBallot.getAddress());
 
     const proposals = ["prop1", "prop2", "prop3", "prop4"];
 
@@ -68,13 +68,23 @@ async function main() {
 
         // todo(fedejinich) this should be removed
         if (voteTxHash == null) {
+            console.log("vote txHash shoudln't be null")
             process.exit()
         }
 
+        // console.log("fetching receipt")
+        // let voteReceipt
+        // while(voteReceipt == undefined || voteReceipt == null) {
+        //     voteReceipt = await hre.ethers.
+        //         provider.getTransactionReceipt(voteTxHash)
+        // }
+        // console.log("receipt")
+        // console.log(voteReceipt)
+
         const voteTime = Date.now() - startVote
-        const voteReceipt = await hre.ethers.provider
-            .getTransactionReceipt(voteTxHash)
-        const voteGas = voteReceipt.gasused
+        // const voteReceipt = await hre.ethers.provider
+        //     .getTransactionReceipt(voteTxHash)
+        const voteGas = voteReceipt.gasUsed
         benchmarks.push({ operation: `vote`, time: voteTime, gas: voteGas })
 
         // parse log
@@ -101,7 +111,7 @@ async function main() {
     const startWinner = Date.now();
 
     // pickup winner
-    const res = await fhBallot.winner({ gasLimit: 6_800_000 });
+    const res = await fhBallot.winner2({ gasLimit: 6_800_000 });
 
     const winnerTime = Date.now() - startWinner;
     const rec = await res.wait()
@@ -130,57 +140,45 @@ function generateVotes() {
 }
 
 
-async function sendEncryptedTransaction(signer, toAddr, encryptedParams, nonce) {
-    console.log("encryptedparams " + encryptedParams)
+async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
+    const nonce = await hre.ethers.provider.getTransactionCount(signer.address)
     const txData = {
         from: signer.address,
         to: toAddr,
         value: hre.ethers.toBeHex(1),
         nonce: nonce,
         data: "0x5128ec02", // keccack256("vote2(bytes)")
-        gasLimit: hre.ethers.toBeHex(2100),
+        gasLimit: hre.ethers.toBeHex(6_800_000), //2100),
         gas: hre.ethers.toBeHex(2100),
-        gasPrice: hre.ethers.toBeHex(0),
+        gasPrice: hre.ethers.toBeHex(1),
+        chainId: 33
     }
-
-    // const signed = signer.signtransaction(txdata)
-
-    // stored votes key 
-    // const voteskey = 'some key'// todo(fedejinich) implement this
 
     const tx = LegacyTransaction.fromTxData(txData)
     const fromPk = cowPrivateKey(signer.address)
-    console.log("this frompk " + fromPk)
-    console.log(fromPk.length)
-    tx.sign(ethUtil.bufArrToArr(ethUtil.toBuffer("0x" + fromPk)))
-    console.log("is signed" + tx.isSigned())
-    const txBytes = tx.serialize()
-    const txHex = bytesToHex(txBytes)
-    console.log("this txhex" + txHex)
+    const txSigned = tx.sign(ethUtil.toBuffer("0x" + fromPk))
+    const txBytes = txSigned.serialize()
 
-    console.log("t " + encryptedParams[0].length)
-    // const ep = encryptedparams[0].map(e => biginttounpaddedbytes(bigint(e)))
-    // console.log(ep)
+    const txHex = bytesToHex(txBytes)
+
     const epRes = ethUtil.rlp.encode(encryptedParams[0])
     const epResHex = bytesToHex(epRes)
-    console.log("epResHex " + epResHex)
 
     const encryptedTx = ethUtil.rlp.encode([txHex, epResHex])
-    // const encryptedtx = ethutil.rlp.encode([txhex, ep])
     const encryptedTxHex = bytesToHex(encryptedTx)
+
     try {
-        // const payloadtx = object.assign({}, {}, { method: 'rsk_sendencryptedtransaction', params: [txhex] })
-        const payloadTx = Object.assign({}, {}, { method: 'rsk_sendEncryptedTransaction', params: [encryptedTxHex] })
+        // const payloadTx = Object.assign({}, {}, { method: 'rsk_sendEncryptedTransaction', params: [encryptedTxHex] })
+        const payloadTx = Object.assign({}, {}, { method: 'eth_sendEncryptedTransaction', params: [encryptedTxHex] })
         const resp = await axios({
             url: "http://localhost:4444",
-            method: 'post',
+            method: 'POST',
             data: payloadTx,
             headers: { 'Content-Type': 'application/json' }
         })
         const txHash = resp.data
 
-        // const txhash = response.data.result;
-        console.log('transaction hash:', txHash)
+        console.log('encryptedTxHash:', txHash)
 
         return txHash
     } catch (error) {
@@ -224,6 +222,6 @@ function cowPrivateKey(addr) {
 // and properly handle errors.
 main().catch((error) => {
     console.error(error);
-    process.exitCode= 1;
+    process.exitCode = 1;
 });
 
