@@ -38,6 +38,7 @@ contract PrivateBallot2 {
     address ADD_ADDR = 0x0000000000000000000000000000000001000011;
     address TRANS_ADDR = 0x0000000000000000000000000000000001000014;
     address DECRYPT_ADDR = 0x0000000000000000000000000000000001000016;
+    address ENC_PARAMS_ADDR = 0x0000000000000000000000000000000001000017;
 
     function addProposal(string memory p) public {
         Proposal memory prop = Proposal(p, true);
@@ -59,15 +60,16 @@ contract PrivateBallot2 {
         emit NewEncryptedVote(msg.sender);
     }
 
-    event Foo(bool);
+    event Foo(bytes);
 
     //function vote2(bytes memory encryptedVote) public {
     //function vote2(bytes memory encryptedVote) public {
     //function vote2(bytes32 encryptedVote) public {
     function vote2() public {
-        //emit Foo(votes[msg.sender].exists);
         //require(!votes[msg.sender].exists, "Address already voted");
-/*
+        bytes memory encryptedVote = fetchEncryptedData("encryptedVote");
+        //emit Foo(encryptedVote);
+        /*
         EncryptedVote memory v = EncryptedVote(encryptedVote, true);
         votes[msg.sender] = v;
         votesAux.push(msg.sender);
@@ -172,6 +174,16 @@ contract PrivateBallot2 {
         bytes memory data = bytes.concat(op1, op2);
 
         return callToPrec(ADD_ADDR, data);
+    }
+
+    function fetchEncryptedData(bytes32 id) 
+        public 
+        view
+        returns (bytes memory)
+    {
+        bytes memory data = abi.encodePacked(id);
+
+        return callToPrec(ENC_PARAMS_ADDR, data);
     }
 
     function bytesToUint64Array(bytes memory b)

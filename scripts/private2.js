@@ -34,6 +34,7 @@ async function main() {
         const p = proposals[i];
 
         console.log(`casting proposal #${i + 1}`);
+        console.log(`signer addr ` + await signers[i].getAddress()) 
 
         const startAddProposal = Date.now();
 
@@ -64,7 +65,10 @@ async function main() {
         // new vote
         const ballotAddr = await fhBallot.getAddress()
         const voteTxHash = await sendEncryptedTransaction(signers[i],
-            ballotAddr, [votes[i]], i)
+            ballotAddr, [votes[i]])
+
+
+        console.log("this votehash " + voteTxHash) 
 
         // todo(fedejinich) this should be removed
         if (voteTxHash == null) {
@@ -139,23 +143,31 @@ function generateVotes() {
     return votesJson.votesPasta
 }
 
-
+const { Common } = require('@ethereumjs/common')
 async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
+    const fromPk = cowPrivateKey(signer.address)
+    console.log("this pk")
+    console.log(fromPk)
+    console.log("this pub")
+    console.log(signer.address)
+    // const wallet = new ethers.Wallet("0x" + fromPk, provider);
     const nonce = await hre.ethers.provider.getTransactionCount(signer.address)
     const txData = {
         from: signer.address,
         to: toAddr,
-        value: hre.ethers.toBeHex(1),
+        value: hre.ethers.toBeHex(0),
         nonce: nonce,
-        data: "0x5128ec02", // keccack256("vote2(bytes)")
+        data: "0xa24a4e88", // no data needed
         gasLimit: hre.ethers.toBeHex(6_800_000), //2100),
-        gas: hre.ethers.toBeHex(2100),
-        gasPrice: hre.ethers.toBeHex(1),
-        chainId: 33
+        gas: hre.ethers.toBeHex(6_800_000),
+        gasPrice: hre.ethers.toBeHex(0),
+        chainId: hre.ethers.toBeHex(33)
     }
+    // const sTx = await wallet.signTransaction(txData)
 
-    const tx = LegacyTransaction.fromTxData(txData)
-    const fromPk = cowPrivateKey(signer.address)
+    // const common = new Common({ chain: 33 })
+    const ops = Common.custom({ chainId: 33 })
+    const tx = LegacyTransaction.fromTxData(txData, ops)
     const txSigned = tx.sign(ethUtil.toBuffer("0x" + fromPk))
     const txBytes = txSigned.serialize()
 
@@ -168,6 +180,7 @@ async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
     const encryptedTxHex = bytesToHex(encryptedTx)
 
     try {
+        // const payloadTx = Object.assign({}, {}, { method: 'eth_sendRawTransaction', params: [txHex] })
         // const payloadTx = Object.assign({}, {}, { method: 'rsk_sendEncryptedTransaction', params: [encryptedTxHex] })
         const payloadTx = Object.assign({}, {}, { method: 'eth_sendEncryptedTransaction', params: [encryptedTxHex] })
         const resp = await axios({
@@ -176,9 +189,11 @@ async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
             data: payloadTx,
             headers: { 'Content-Type': 'application/json' }
         })
+
+        console.log(resp)
         const txHash = resp.data
 
-        console.log('encryptedTxHash:', txHash)
+        console.log('encryptedTxHash '+ txHash)
 
         return txHash
     } catch (error) {
