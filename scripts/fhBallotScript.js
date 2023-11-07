@@ -16,7 +16,7 @@ async function main() {
     const benchmarks = [];
 
     const signers = await hre.ethers.getSigners();
-    const factory = await hre.ethers.getContractFactory("PrivateBallot2");
+    const factory = await hre.ethers.getContractFactory("FhBallot");
 
     const fhBallot = await factory.deploy({ gasLimit: 6_000_000 });
     await fhBallot.waitForDeployment()

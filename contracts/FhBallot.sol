@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 // todo(fedejinich) add feature to show the vote only to the owner
 
-contract PrivateBallot2 {
+contract FhBallot {
     bool open = true;
     string public cause;
     mapping(address => Proposal) private proposals;
