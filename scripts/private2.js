@@ -24,6 +24,8 @@ async function main() {
     console.log("contract successfully deployed to address:", await fhBallot.getAddress());
 
     const proposals = ["prop1", "prop2", "prop3", "prop4"];
+    
+    console.log(`\n-------------- CASTING PROPOSALS --------------\n`)
 
     for (let i = 0; i < proposals.length; i++) {
         const p = proposals[i];
@@ -49,7 +51,8 @@ async function main() {
         }
     }
 
-    console.log("waiting for votes...");
+    console.log(`\n-------------- VOTING --------------\n`)
+
     const votes = generateVotes();
     for (let i = 0; i < votes.length; i++) {
         const startVote = Date.now()
@@ -91,6 +94,7 @@ async function main() {
 
     console.log("closing ballot")
 
+    
     const startClose = Date.now();
 
     // close ballot
@@ -102,8 +106,8 @@ async function main() {
         gas: closeGas
     });
 
-    console.log("determining the winning proposal...");
-
+    console.log(`\n-------------- COUNTING VOTES --------------\n`)
+    
     const startWinner = Date.now();
 
     // pickup winner
