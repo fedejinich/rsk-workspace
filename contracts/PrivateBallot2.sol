@@ -66,10 +66,9 @@ contract PrivateBallot2 {
     //function vote2(bytes memory encryptedVote) public {
     //function vote2(bytes32 encryptedVote) public {
     function vote2() public {
-        //require(!votes[msg.sender].exists, "Address already voted");
+        require(!votes[msg.sender].exists, "Address already voted");
         bytes memory encryptedVote = fetchEncryptedData("encryptedVote");
-        encryptedResult = encryptedVote;
-        
+
         EncryptedVote memory v = EncryptedVote(encryptedVote, true);
         votes[msg.sender] = v;
         votesAux.push(msg.sender);
@@ -77,14 +76,13 @@ contract PrivateBallot2 {
         // 'initialize' encryptedResult
         if (encryptedResult.length == 0) {
             encryptedResult = encryptedVote;
+
             emit NewEncryptedVote2(msg.sender);
+        } else {
+            encryptedResult = add(encryptedResult, encryptedVote);
 
-            return;
+            emit NewEncryptedVote2(msg.sender);
         }
-
-        encryptedResult = add(encryptedResult, encryptedVote);
-
-        emit NewEncryptedVote2(msg.sender);
     }
 
     // todo(fedejinich) restric this to only owner
@@ -163,8 +161,6 @@ contract PrivateBallot2 {
         emit Winner2(proposals[addr].proposal, maxValue);
     }
 
-
-
     function add(bytes memory op1, bytes memory op2)
         internal
         view
@@ -175,11 +171,7 @@ contract PrivateBallot2 {
         return callToPrec(ADD_ADDR, data);
     }
 
-    function fetchEncryptedData(bytes32 id) 
-        public 
-        view
-        returns (bytes memory)
-    {
+    function fetchEncryptedData(bytes32 id) public view returns (bytes memory) {
         bytes memory data = abi.encodePacked(id);
 
         return callToPrec(ENC_PARAMS_ADDR, data);

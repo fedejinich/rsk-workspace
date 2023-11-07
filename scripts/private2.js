@@ -8,7 +8,6 @@
 const hre = require('hardhat');
 const fs = require('fs');
 const ethUtil = require('ethereumjs-util');
-const { bigIntToUnpaddedBytes } = require('@ethereumjs/util');
 const LegacyTransaction = require('@ethereumjs/tx').LegacyTransaction
 const axios = require('axios');
 const bytesToHex = require("@ethereumjs/util").bytesToHex
@@ -19,13 +18,8 @@ async function main() {
     const signers = await hre.ethers.getSigners();
     const factory = await hre.ethers.getContractFactory("PrivateBallot2");
 
-    // const startdeploy = date.now();
     const fhBallot = await factory.deploy({ gasLimit: 6_000_000 });
     await fhBallot.waitForDeployment()
-    // console.log(a)
-    // const deploytime = date.now() - startdeploy;
-    // const deploygas = a.gasused.tonumber();
-    // benchmarks.push({ operation: 'deploy', time: deploytime });//, gas: deploygas });
     console.log("contract successfully deployed to address:", await fhBallot.getAddress());
 
     const proposals = ["prop1", "prop2", "prop3", "prop4"];
@@ -64,8 +58,14 @@ async function main() {
 
         // new vote
         const ballotAddr = await fhBallot.getAddress()
+        // const vote = [votes[i]]
+        const vote = votes[i]
+        console.log("this vote")
+        console.log(vote)
         const voteTxHash = await sendEncryptedTransaction(signers[i],
-            ballotAddr, [votes[i]])
+            ballotAddr, vote)
+
+        const voteTime = Date.now() - startVote
 
         // todo(fedejinich) this should be removed
         if (voteTxHash == null) {
@@ -73,16 +73,6 @@ async function main() {
             process.exit()
         }
 
-        // console.log("fetching receipt")
-        // let voteReceipt
-        // while(voteReceipt == undefined || voteReceipt == null) {
-        //     voteReceipt = await hre.ethers.
-        //         provider.getTransactionReceipt(voteTxHash)
-        // }
-        // console.log("receipt")
-        // console.log(voteReceipt)
-
-        const voteTime = Date.now() - startVote
         const voteReceipt = await hre.ethers.provider
             .getTransactionReceipt(voteTxHash)
 
@@ -111,7 +101,10 @@ async function main() {
     const res0 = await fhBallot.closeBallot({ gasLimit: 6_800_000 });
     const closeTime = Date.now() - startClose;
     const closeGas = (await res0.wait()).gasUsed
-    benchmarks.push({ operation: 'closeballot', time: closeTime, gas: closeGas });
+    benchmarks.push({
+        operation: 'closeballot', time: closeTime,
+        gas: closeGas
+    });
 
     console.log("determining the winning proposal...");
 
@@ -123,7 +116,10 @@ async function main() {
     const winnerTime = Date.now() - startWinner;
     const rec = await res.wait()
     const winnerGas = rec.gasUsed
-    benchmarks.push({ operation: 'determinewinner', time: winnerTime, gas: winnerGas });
+    benchmarks.push({
+        operation: 'determinewinner', time: winnerTime,
+        gas: winnerGas
+    });
 
     // parse log
     try {
@@ -141,16 +137,18 @@ async function main() {
 }
 
 function generateVotes() {
-    const votesJson = require('/Users/fedejinich/Projects/rsk-workspace/scripts/votes.json');
+    const votesJson = require('/Users/fedejinich/Projects/' +
+        'rsk-workspace/scripts/votes.json');
 
     return votesJson.votesPasta
 }
 
 const { Common } = require('@ethereumjs/common')
-async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
-    const fromPk = cowPrivateKey(signer.address)
-    // const wallet = new ethers.Wallet("0x" + fromPk, provider);
-    const nonce = await hre.ethers.provider.getTransactionCount(signer.address)
+async function sendEncryptedTransaction(signer, toAddr, encryptedVote) {
+    const fromPrivateKey = cowPrivateKey(signer.address)
+
+    const nonce = await hre.ethers.provider
+        .getTransactionCount(signer.address)
     const txData = {
         from: signer.address,
         to: toAddr,
@@ -162,17 +160,16 @@ async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
         gasPrice: hre.ethers.toBeHex(0),
         chainId: hre.ethers.toBeHex(33)
     }
-    // const sTx = await wallet.signTransaction(txData)
 
-    // const common = new Common({ chain: 33 })
-    const ops = Common.custom({ chainId: 33 })
-    const tx = LegacyTransaction.fromTxData(txData, ops)
-    const txSigned = tx.sign(ethUtil.toBuffer("0x" + fromPk))
+    const tx = LegacyTransaction.fromTxData(txData,
+        Common.custom({ chainId: 33 }))
+    const txSigned = tx.sign(ethUtil.toBuffer("0x" + fromPrivateKey))
     const txBytes = txSigned.serialize()
 
     const txHex = bytesToHex(txBytes)
 
-    const epRes = ethUtil.rlp.encode(encryptedParams[0])
+    // const epRes = ethUtil.rlp.encode(encryptedVote[0])
+    const epRes = ethUtil.rlp.encode(encryptedVote)
     const epResHex = bytesToHex(epRes)
 
     const encryptedTx = ethUtil.rlp.encode([txHex, epResHex])
@@ -180,10 +177,10 @@ async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
 
     try {
         const payloadTx = Object.assign({}, {}, {
+            id: '1',
             jsonrpc: '2.0',
             method: 'eth_sendEncryptedTransaction',
             params: [encryptedTxHex],
-            id: '1'
         })
         const res = await axios({
             url: "http://localhost:4444",
