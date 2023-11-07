@@ -68,8 +68,8 @@ contract PrivateBallot2 {
     function vote2() public {
         //require(!votes[msg.sender].exists, "Address already voted");
         bytes memory encryptedVote = fetchEncryptedData("encryptedVote");
-        //emit Foo(encryptedVote);
-        /*
+        encryptedResult = encryptedVote;
+        
         EncryptedVote memory v = EncryptedVote(encryptedVote, true);
         votes[msg.sender] = v;
         votesAux.push(msg.sender);
@@ -77,15 +77,14 @@ contract PrivateBallot2 {
         // 'initialize' encryptedResult
         if (encryptedResult.length == 0) {
             encryptedResult = encryptedVote;
-            emit NewEncryptedVote2(msg.sender);
+          //  emit NewEncryptedVote2(msg.sender);
 
             return;
         }
 
         encryptedResult = add(encryptedResult, encryptedVote);
 
-        emit NewEncryptedVote2(msg.sender);
-        */
+        //emit NewEncryptedVote2(msg.sender);
     }
 
     // todo(fedejinich) restric this to only owner

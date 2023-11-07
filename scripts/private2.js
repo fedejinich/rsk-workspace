@@ -68,7 +68,7 @@ async function main() {
             ballotAddr, [votes[i]])
 
 
-        console.log("this votehash " + voteTxHash) 
+        console.log("this votehash " + typeof voteTxHash) 
 
         // todo(fedejinich) this should be removed
         if (voteTxHash == null) {
@@ -86,11 +86,11 @@ async function main() {
         // console.log(voteReceipt)
 
         const voteTime = Date.now() - startVote
-        // const voteReceipt = await hre.ethers.provider
-        //     .getTransactionReceipt(voteTxHash)
+        const voteReceipt = await hre.ethers.provider
+            .getTransactionReceipt(voteTxHash)
         const voteGas = voteReceipt.gasUsed
         benchmarks.push({ operation: `vote`, time: voteTime, gas: voteGas })
-
+        
         // parse log
         try {
             const parsedLog = fhBallot.interface.parseLog(voteReceipt.logs[0]);
@@ -105,7 +105,7 @@ async function main() {
     const startClose = Date.now();
 
     // close ballot
-    const res0 = await fhBallot.closeballot({ gasLimit: 6_800_000 });
+    const res0 = await fhBallot.closeBallot({ gasLimit: 6_800_000 });
     const closeTime = Date.now() - startClose;
     const closeGas = (await res0.wait()).gasUsed
     benchmarks.push({ operation: 'closeballot', time: closeTime, gas: closeGas });
@@ -190,7 +190,8 @@ async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
             headers: { 'Content-Type': 'application/json' }
         })
 
-        console.log(resp)
+        console.log(resp.data)
+
         const txHash = resp.data
 
         console.log('encryptedTxHash '+ txHash)
