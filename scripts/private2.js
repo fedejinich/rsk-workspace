@@ -20,6 +20,7 @@ async function main() {
 
     const fhBallot = await factory.deploy({ gasLimit: 6_000_000 });
     await fhBallot.waitForDeployment()
+    
     console.log("contract successfully deployed to address:", await fhBallot.getAddress());
 
     const proposals = ["prop1", "prop2", "prop3", "prop4"];
@@ -28,7 +29,6 @@ async function main() {
         const p = proposals[i];
 
         console.log(`casting proposal #${i + 1}`);
-        console.log(`signer addr ` + await signers[i].getAddress())
 
         const startAddProposal = Date.now();
 
@@ -58,16 +58,12 @@ async function main() {
 
         // new vote
         const ballotAddr = await fhBallot.getAddress()
-        // const vote = [votes[i]]
         const vote = votes[i]
-        console.log("this vote")
-        console.log(vote)
         const voteTxHash = await sendEncryptedTransaction(signers[i],
             ballotAddr, vote)
 
         const voteTime = Date.now() - startVote
 
-        // todo(fedejinich) this should be removed
         if (voteTxHash == null) {
             console.log("vote txHash shoudln't be null")
             process.exit()
@@ -168,7 +164,6 @@ async function sendEncryptedTransaction(signer, toAddr, encryptedVote) {
 
     const txHex = bytesToHex(txBytes)
 
-    // const epRes = ethUtil.rlp.encode(encryptedVote[0])
     const epRes = ethUtil.rlp.encode(encryptedVote)
     const epResHex = bytesToHex(epRes)
 

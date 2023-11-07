@@ -1,12 +1,12 @@
 operation,time (ms),gas
-addProposal,158,107631
-addProposal,125,92631
-addProposal,83,92631
-addProposal,122,92631
-vote,14483,168013
-vote,12579,126894
-vote,12177,126894
-vote,12075,126894
-vote,12062,126894
-closeballot,58,13875
-determinewinner,645,35426
+addProposal,171,107631
+addProposal,121,92631
+addProposal,99,92631
+addProposal,119,92631
+vote,13948,168035
+vote,12317,126916
+vote,12215,126916
+vote,12171,126916
+vote,12117,126916
+closeballot,49,13886
+determinewinner,799,35426

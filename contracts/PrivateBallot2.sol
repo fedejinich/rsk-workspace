@@ -50,21 +50,6 @@ contract PrivateBallot2 {
         emit NewProposal(msg.sender, prop.proposal);
     }
 
-    function vote(bytes memory encryptedVote) public {
-        require(!votes[msg.sender].exists, "Address already voted");
-
-        EncryptedVote memory v = EncryptedVote(encryptedVote, true);
-        votes[msg.sender] = v;
-        votesAux.push(msg.sender);
-
-        emit NewEncryptedVote(msg.sender);
-    }
-
-    event Foo(bytes);
-
-    //function vote2(bytes memory encryptedVote) public {
-    //function vote2(bytes memory encryptedVote) public {
-    //function vote2(bytes32 encryptedVote) public {
     function vote2() public {
         require(!votes[msg.sender].exists, "Address already voted");
         bytes memory encryptedVote = fetchEncryptedData("encryptedVote");
