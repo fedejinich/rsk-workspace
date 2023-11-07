@@ -77,14 +77,14 @@ contract PrivateBallot2 {
         // 'initialize' encryptedResult
         if (encryptedResult.length == 0) {
             encryptedResult = encryptedVote;
-          //  emit NewEncryptedVote2(msg.sender);
+            emit NewEncryptedVote2(msg.sender);
 
             return;
         }
 
         encryptedResult = add(encryptedResult, encryptedVote);
 
-        //emit NewEncryptedVote2(msg.sender);
+        emit NewEncryptedVote2(msg.sender);
     }
 
     // todo(fedejinich) restric this to only owner

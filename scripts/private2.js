@@ -34,7 +34,7 @@ async function main() {
         const p = proposals[i];
 
         console.log(`casting proposal #${i + 1}`);
-        console.log(`signer addr ` + await signers[i].getAddress()) 
+        console.log(`signer addr ` + await signers[i].getAddress())
 
         const startAddProposal = Date.now();
 
@@ -67,9 +67,6 @@ async function main() {
         const voteTxHash = await sendEncryptedTransaction(signers[i],
             ballotAddr, [votes[i]])
 
-
-        console.log("this votehash " + typeof voteTxHash) 
-
         // todo(fedejinich) this should be removed
         if (voteTxHash == null) {
             console.log("vote txHash shoudln't be null")
@@ -88,9 +85,15 @@ async function main() {
         const voteTime = Date.now() - startVote
         const voteReceipt = await hre.ethers.provider
             .getTransactionReceipt(voteTxHash)
+
+        if (voteReceipt == null) {
+            console.log("vote receipt shouldn't be null")
+            process.exit()
+        }
+
         const voteGas = voteReceipt.gasUsed
         benchmarks.push({ operation: `vote`, time: voteTime, gas: voteGas })
-        
+
         // parse log
         try {
             const parsedLog = fhBallot.interface.parseLog(voteReceipt.logs[0]);
@@ -134,7 +137,7 @@ async function main() {
     const csvContent = "operation,time (ms),gas\n" + benchmarks.map(b => `${b.operation},${b.time},${b.gas}`).join("\n");
 
     // write csv to file
-    fs.writefilesync('benchmark2_results.csv', csvContent);
+    fs.writeFileSync('benchmark2_results.csv', csvContent);
 }
 
 function generateVotes() {
@@ -146,10 +149,6 @@ function generateVotes() {
 const { Common } = require('@ethereumjs/common')
 async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
     const fromPk = cowPrivateKey(signer.address)
-    console.log("this pk")
-    console.log(fromPk)
-    console.log("this pub")
-    console.log(signer.address)
     // const wallet = new ethers.Wallet("0x" + fromPk, provider);
     const nonce = await hre.ethers.provider.getTransactionCount(signer.address)
     const txData = {
@@ -180,21 +179,22 @@ async function sendEncryptedTransaction(signer, toAddr, encryptedParams) {
     const encryptedTxHex = bytesToHex(encryptedTx)
 
     try {
-        // const payloadTx = Object.assign({}, {}, { method: 'eth_sendRawTransaction', params: [txHex] })
-        // const payloadTx = Object.assign({}, {}, { method: 'rsk_sendEncryptedTransaction', params: [encryptedTxHex] })
-        const payloadTx = Object.assign({}, {}, { method: 'eth_sendEncryptedTransaction', params: [encryptedTxHex] })
-        const resp = await axios({
+        const payloadTx = Object.assign({}, {}, {
+            jsonrpc: '2.0',
+            method: 'eth_sendEncryptedTransaction',
+            params: [encryptedTxHex],
+            id: '1'
+        })
+        const res = await axios({
             url: "http://localhost:4444",
             method: 'POST',
             data: payloadTx,
             headers: { 'Content-Type': 'application/json' }
         })
 
-        console.log(resp.data)
+        const txHash = res.data.result
 
-        const txHash = resp.data
-
-        console.log('encryptedTxHash '+ txHash)
+        console.log('tx hash ' + txHash)
 
         return txHash
     } catch (error) {
