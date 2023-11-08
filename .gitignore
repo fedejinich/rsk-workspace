@@ -9,3 +9,7 @@ typechain-types
 cache
 artifacts
 .idea/
+
+# benchmark files
+*.png
+*.csv

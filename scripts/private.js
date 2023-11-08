@@ -47,7 +47,6 @@ async function main() {
 
     const votes = generateVotes();
     for (let i = 0; i < votes.length; i++) {
-
         const startVote = Date.now()
         const voteResponse = await fhBallot.connect(signers[i]).vote(votes[i], { gasLimit: 6_000_000 })
         const voteTime = Date.now() - startVote
