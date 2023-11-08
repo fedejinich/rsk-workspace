@@ -55,13 +55,12 @@ async function main() {
 
     const votes = generateVotes();
     for (let i = 0; i < votes.length; i++) {
-        const startVote = Date.now()
-
         console.log(`casting vote #${i + 1}`);
 
-        // new vote
-        const ballotAddr = await fhBallot.getAddress()
         const vote = votes[i]
+        const ballotAddr = await fhBallot.getAddress()
+
+        const startVote = Date.now()
         const voteTxHash = await sendEncryptedTransaction(signers[i],
             ballotAddr, vote)
 
@@ -102,7 +101,7 @@ async function main() {
     const closeTime = Date.now() - startClose;
     const closeGas = (await res0.wait()).gasUsed
     benchmarks.push({
-        operation: 'closeballot', time: closeTime,
+        operation: 'closeBallot', time: closeTime,
         gas: closeGas
     });
 
@@ -117,7 +116,7 @@ async function main() {
     const rec = await res.wait()
     const winnerGas = rec.gasUsed
     benchmarks.push({
-        operation: 'determinewinner', time: winnerTime,
+        operation: 'determineWinner', time: winnerTime,
         gas: winnerGas
     });
 
@@ -130,10 +129,10 @@ async function main() {
     }
 
     // generate csv content
-    const csvContent = "operation,time (ms),gas\n" + benchmarks.map(b => `${b.operation},${b.time},${b.gas}`).join("\n");
+    const csvContent = "Operation,Time (ms),Gas\n" + benchmarks.map(b => `${b.operation},${b.time},${b.gas}`).join("\n");
 
     // write csv to file
-    fs.writeFileSync('benchmark2_results.csv', csvContent);
+    fs.writeFileSync('benchmark_results.csv', csvContent);
 }
 
 function generateVotes() {
